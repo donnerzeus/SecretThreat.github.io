@@ -290,7 +290,8 @@ export const startGame = async (roomId: string) => {
         guardianPolicies: 0,
         shadowPolicies: 0,
         electionTracker: 0,
-        vetoPowerUnlocked: false
+        vetoPowerUnlocked: false,
+        logs: [createLog("Game Started!", "success")]
     });
 
     await batch.commit();
@@ -331,12 +332,18 @@ export const performInvestigate = async (roomId: string, targetUid: string) => {
         if (!roleSnap.exists()) throw new Error('Role not found');
         const roleData = roleSnap.data() as PlayerRole;
 
+        // Get target name
+        const playerRef = doc(db, `rooms/${roomId}/players`, targetUid);
+        const playerSnap = await transaction.get(playerRef);
+        const playerName = playerSnap.data()?.displayName || "Unknown";
+
         const investigated = { ...(room.investigatedPlayers || {}), [targetUid]: roleData.team };
 
         // THEN WRITE
         transaction.update(roomRef, {
             investigatedPlayers: investigated,
-            turnPhase: 'nominating' // End of power, next turn
+            turnPhase: 'nominating', // End of power, next turn
+            logs: [...(room.logs || []), createLog(`President investigated ${playerName}.`, "info")]
         });
 
         await endTurn(transaction, roomRef, room);
@@ -348,16 +355,20 @@ export const performExecution = async (roomId: string, targetUid: string) => {
     await runTransaction(db, async (transaction) => {
         const roomSnap = await transaction.get(roomRef);
         if (!roomSnap.exists()) throw new Error('Room not found');
-
+        const room = roomSnap.data() as Room;
 
         // READ FIRST
         const roleRef = doc(db, `rooms/${roomId}/playerRoles`, targetUid);
         const roleSnap = await transaction.get(roleRef);
         const roleData = roleSnap.data() as PlayerRole;
 
+        // Get target name
+        const playerRef = doc(db, `rooms/${roomId}/players`, targetUid);
+        const playerSnap = await transaction.get(playerRef);
+        const playerName = playerSnap.data()?.displayName || "Unknown";
+
         // THEN WRITE
         // Kill player
-        const playerRef = doc(db, `rooms/${roomId}/players`, targetUid);
         transaction.update(playerRef, { isAlive: false });
 
         // Check if Secret Threat was killed
@@ -365,11 +376,15 @@ export const performExecution = async (roomId: string, targetUid: string) => {
             transaction.update(roomRef, {
                 winner: 'Guardians',
                 turnPhase: 'game_over',
-                status: 'ended'
+                status: 'ended',
+                logs: [...(room.logs || []), createLog(`President executed ${playerName} (SECRET THREAT)! Guardians Win!`, "success")]
             });
         } else {
             if (!roomSnap.exists()) throw new Error('Room not found');
             const room = roomSnap.data() as Room;
+            transaction.update(roomRef, {
+                logs: [...(room.logs || []), createLog(`President executed ${playerName}.`, "danger")]
+            });
             await endTurn(transaction, roomRef, room);
         }
     });
@@ -433,12 +448,13 @@ const endTurn = async (transaction: any, roomRef: any, room: Room) => {
     });
 };
 
-export const nominateChancellor = async (roomId: string, candidateUid: string) => {
+export const nominateChancellor = async (roomId: string, candidateUid: string, candidateName: string) => {
     const roomRef = doc(db, 'rooms', roomId);
     await updateDoc(roomRef, {
         currentChancellorCandidateUid: candidateUid,
         turnPhase: 'voting',
-        votes: {}
+        votes: {},
+        logs: arrayUnion(createLog(`President nominated ${candidateName} as Chancellor.`, 'info'))
     });
 };
 
@@ -475,7 +491,8 @@ export const voteOnGovernment = async (roomId: string, uid: string, vote: VoteCh
                     transaction.update(roomRef, {
                         winner: 'Shadows',
                         turnPhase: 'game_over',
-                        status: 'ended'
+                        status: 'ended',
+                        logs: [...(room.logs || []), createLog("Secret Threat elected Chancellor! Shadows Win!", "danger")]
                     });
                     return;
                 }
@@ -498,7 +515,8 @@ export const voteOnGovernment = async (roomId: string, uid: string, vote: VoteCh
                 policyDeck: deck,
                 policyDiscard: discard,
                 hand: hand,
-                electionTracker: 0
+                electionTracker: 0,
+                logs: [...(room.logs || []), createLog("Vote Passed! Chancellor elected.", "success")]
             });
         } else {
             // Failed Vote
@@ -539,7 +557,8 @@ export const voteOnGovernment = async (roomId: string, uid: string, vote: VoteCh
                     lastPolicyEnacted: enactedPolicy,
                     policyDeck: deck,
                     policyDiscard: discard,
-                    electionTracker: 0
+                    electionTracker: 0,
+                    logs: [...(room.logs || []), createLog(`Chaos! ${enactedPolicy} Policy enacted due to failed votes.`, "danger")]
                 });
                 await endTurn(transaction, roomRef, room);
 
@@ -547,7 +566,8 @@ export const voteOnGovernment = async (roomId: string, uid: string, vote: VoteCh
                 // Just next president
                 transaction.update(roomRef, {
                     votes: newVotes,
-                    electionTracker: tracker
+                    electionTracker: tracker,
+                    logs: [...(room.logs || []), createLog("Vote Failed! Election Tracker advanced.", "warning")]
                 });
                 await endTurn(transaction, roomRef, room);
             }
@@ -561,6 +581,11 @@ export const endPeek = async (roomId: string) => {
         const roomSnap = await transaction.get(roomRef);
         if (!roomSnap.exists()) throw new Error('Room not found');
         const room = roomSnap.data() as Room;
+
+        transaction.update(roomRef, {
+            logs: [...(room.logs || []), createLog("President finished peeking.", "info")]
+        });
+
         await endTurn(transaction, roomRef, room);
     });
 };

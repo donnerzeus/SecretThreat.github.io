@@ -102,7 +102,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({ room, players, myPlayer })
 
 
     const handleNominate = async (candidateUid: string) => {
-        await nominateChancellor(room.roomId, candidateUid);
+        const candidate = players.find(p => p.uid === candidateUid);
+        if (candidate) {
+            await nominateChancellor(room.roomId, candidateUid, candidate.displayName);
+        }
     };
 
     const handleVote = async (vote: VoteChoice) => {
