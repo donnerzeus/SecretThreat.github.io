@@ -8,6 +8,7 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { GameBoard } from '../components/game/GameBoard';
 import { Users, Copy, Play, Loader2 } from 'lucide-react';
+import { useGameSounds } from '../hooks/useGameSounds';
 
 const GameLobby: React.FC<{ room: Room; players: Player[]; isHost: boolean }> = ({ room, players, isHost }) => {
     const copyCode = () => {
@@ -94,11 +95,12 @@ const GameLobby: React.FC<{ room: Room; players: Player[]; isHost: boolean }> = 
 
 export const GameRoom: React.FC = () => {
     const { roomId } = useParams<{ roomId: string }>();
-    const { user } = useAuth();
     const navigate = useNavigate();
+    const { user } = useAuth();
     const [room, setRoom] = useState<Room | null>(null);
     const [players, setPlayers] = useState<Player[]>([]);
 
+    useGameSounds(room);
 
     useEffect(() => {
         if (!roomId) return;
