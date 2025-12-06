@@ -14,7 +14,86 @@ import {
 } from 'firebase/firestore';
 import { signInAnonymously as firebaseSignInAnonymously, updateProfile } from 'firebase/auth';
 import { auth, db } from './firebase';
-import type { Room, Player, Role, PlayerRole, VoteChoice, PolicyType, TurnPhase } from '../types';
+import type { Room, Player, Role, PlayerRole, VoteChoice, PolicyType, TurnPhase, GameLog, Team } from '../types';
+
+// ... (imports)
+
+// Add these at the end
+export const requestVeto = async (roomId: string) => {
+    const roomRef = doc(db, 'rooms', roomId);
+    await updateDoc(roomRef, {
+        turnPhase: 'veto_requested'
+    });
+};
+
+export const respondToVeto = async (roomId: string, approved: boolean) => {
+    const roomRef = doc(db, 'rooms', roomId);
+    await runTransaction(db, async (transaction) => {
+        const roomSnap = await transaction.get(roomRef);
+        if (!roomSnap.exists()) throw new Error("Room not found");
+        const room = roomSnap.data() as Room;
+
+        if (approved) {
+            // Discard hand
+            const hand = room.hand || [];
+            const discard = [...(room.policyDiscard || []), ...hand];
+
+            let tracker = room.electionTracker + 1;
+
+            if (tracker >= 3) {
+                // Chaos: Enact top policy
+                let deck = [...(room.policyDeck || [])];
+                let discardPile = discard;
+
+                if (deck.length < 1) {
+                    deck = [...deck, ...shuffle(discardPile)];
+                    discardPile = [];
+                }
+
+                const enactedPolicy = deck.shift()!;
+                let guardianPolicies = room.guardianPolicies;
+                let shadowPolicies = room.shadowPolicies;
+
+                if (enactedPolicy === 'Guardian') guardianPolicies++;
+                else shadowPolicies++;
+
+                // Check wins
+                if (guardianPolicies === 6) {
+                    transaction.update(roomRef, { guardianPolicies, winner: 'Guardians', turnPhase: 'game_over', status: 'ended' });
+                    return;
+                }
+                if (shadowPolicies === 6) {
+                    transaction.update(roomRef, { shadowPolicies, winner: 'Shadows', turnPhase: 'game_over', status: 'ended' });
+                    return;
+                }
+
+                transaction.update(roomRef, {
+                    guardianPolicies,
+                    shadowPolicies,
+                    lastPolicyEnacted: enactedPolicy,
+                    policyDeck: deck,
+                    policyDiscard: discardPile,
+                    electionTracker: 0,
+                    hand: []
+                });
+                await endTurn(transaction, roomRef, room);
+
+            } else {
+                transaction.update(roomRef, {
+                    hand: [],
+                    policyDiscard: discard,
+                    electionTracker: tracker
+                });
+                await endTurn(transaction, roomRef, room);
+            }
+        } else {
+            // Rejected: Chancellor must enact
+            transaction.update(roomRef, {
+                turnPhase: 'legislating_chancellor'
+            });
+        }
+    });
+};
 
 // ... (existing imports and functions)
 
@@ -73,6 +152,7 @@ export const createRoom = async (hostUid: string, hostName: string): Promise<str
         winner: null,
         lastPolicyEnacted: null,
         vetoPowerUnlocked: false,
+        logs: []
     };
 
     const hostPlayer: Player = {
@@ -268,7 +348,7 @@ export const performExecution = async (roomId: string, targetUid: string) => {
     await runTransaction(db, async (transaction) => {
         const roomSnap = await transaction.get(roomRef);
         if (!roomSnap.exists()) throw new Error('Room not found');
-        const room = roomSnap.data() as Room;
+
 
         // READ FIRST
         const roleRef = doc(db, `rooms/${roomId}/playerRoles`, targetUid);
@@ -288,10 +368,20 @@ export const performExecution = async (roomId: string, targetUid: string) => {
                 status: 'ended'
             });
         } else {
+            if (!roomSnap.exists()) throw new Error('Room not found');
+            const room = roomSnap.data() as Room;
             await endTurn(transaction, roomRef, room);
         }
     });
 };
+
+// Helper to create a log entry
+const createLog = (message: string, type: 'info' | 'success' | 'danger' | 'warning' = 'info'): GameLog => ({
+    id: Math.random().toString(36).substring(2, 9),
+    message,
+    type,
+    timestamp: Timestamp.now()
+});
 
 export const performSpecialElection = async (roomId: string, nextPresidentUid: string) => {
     const roomRef = doc(db, 'rooms', roomId);
@@ -479,79 +569,77 @@ export const discardPolicy = async (roomId: string, policyToDiscard: PolicyType)
     const roomRef = doc(db, 'rooms', roomId);
 
     await runTransaction(db, async (transaction) => {
-        const roomSnap = await transaction.get(roomRef);
-        if (!roomSnap.exists()) throw new Error('Room not found');
-        const room = roomSnap.data() as Room;
+        const roomDoc = await transaction.get(roomRef);
+        if (!roomDoc.exists()) throw new Error("Room not found");
+        const room = roomDoc.data() as Room;
 
         const hand = [...(room.hand || [])];
         const discardIndex = hand.indexOf(policyToDiscard);
-        if (discardIndex === -1) throw new Error('Policy not in hand');
+        if (discardIndex === -1) throw new Error("Policy not in hand");
 
+        // Remove discarded policy
         hand.splice(discardIndex, 1);
         const discardPile = [...(room.policyDiscard || []), policyToDiscard];
 
+        // Logs
+        let newLogs = [...(room.logs || [])];
+
         if (room.turnPhase === 'legislating_president') {
+            // President discarded 1, pass 2 to Chancellor
+            newLogs.push(createLog("President discarded a policy. Chancellor is now legislating.", "info"));
             transaction.update(roomRef, {
-                hand: hand,
+                hand,
                 policyDiscard: discardPile,
-                turnPhase: 'legislating_chancellor'
+                turnPhase: 'legislating_chancellor',
+                logs: newLogs
             });
         } else if (room.turnPhase === 'legislating_chancellor') {
+            // Chancellor discarded 1, enact the remaining one
             const enactedPolicy = hand[0];
-
             let guardianPolicies = room.guardianPolicies;
             let shadowPolicies = room.shadowPolicies;
+            let winner: Team | null = null;
 
-            if (enactedPolicy === 'Guardian') guardianPolicies++;
-            else shadowPolicies++;
-
-            // Win Condition Checks
-            if (guardianPolicies === 6) {
-                transaction.update(roomRef, {
-                    guardianPolicies,
-                    winner: 'Guardians',
-                    turnPhase: 'game_over',
-                    status: 'ended'
-                });
-                return;
-            }
-            if (shadowPolicies === 6) {
-                transaction.update(roomRef, {
-                    shadowPolicies,
-                    winner: 'Shadows',
-                    turnPhase: 'game_over',
-                    status: 'ended'
-                });
-                return;
+            if (enactedPolicy === 'Guardian') {
+                guardianPolicies++;
+                newLogs.push(createLog("A Guardian Policy has been enacted!", "success"));
+                if (guardianPolicies >= 5) winner = 'Guardians';
+            } else {
+                shadowPolicies++;
+                newLogs.push(createLog("A Shadow Policy has been enacted!", "danger"));
+                if (shadowPolicies >= 6) winner = 'Shadows';
             }
 
-            // Powers
+            // Check for powers
             let nextPhase: TurnPhase = 'nominating';
-
-            if (enactedPolicy === 'Shadow') {
-                // Powers based on player count and policy count
-                // User's previous request:
-                // 2: Investigate
-                // 3: Special Election
-                // 4: Execution + Veto
-                // 5: Execution
-
-                // User complaint implies they expect Peek at 3.
-                // Let's adjust the table to include Peek at 3, keeping Investigate at 2.
-                // This aligns with standard 5-6 player rules for Peek, and user's complaint.
-                // For 5-6 players:
-                // 2: Investigate (User's custom rule)
-                // 3: Policy Peek (Standard rule, user complaint)
-                // 4: Execution + Veto (User's custom rule)
-                // 5: Execution (User's custom rule)
-
+            if (!winner && enactedPolicy === 'Shadow') {
                 if (shadowPolicies === 2) nextPhase = 'pp_investigate';
-                else if (shadowPolicies === 3) nextPhase = 'pp_peek'; // Changed from Special Election to Peek
+                else if (shadowPolicies === 3) nextPhase = 'pp_peek';
                 else if (shadowPolicies === 4) {
                     nextPhase = 'pp_execution';
                     transaction.update(roomRef, { vetoPowerUnlocked: true });
                 }
                 else if (shadowPolicies === 5) nextPhase = 'pp_execution';
+            }
+
+            if (winner) {
+                newLogs.push(createLog(`Game Over! ${winner} Win!`, winner === 'Guardians' ? 'success' : 'danger'));
+                transaction.update(roomRef, {
+                    guardianPolicies,
+                    shadowPolicies,
+                    lastPolicyEnacted: enactedPolicy,
+                    hand: [],
+                    policyDiscard: discardPile,
+                    electionTracker: 0,
+                    turnPhase: 'game_over',
+                    winner,
+                    logs: newLogs
+                });
+                return;
+            }
+
+            if (nextPhase !== 'nominating') {
+                newLogs.push(createLog(`Presidential Power Unlocked: ${nextPhase.replace('pp_', '').toUpperCase()}`, "warning"));
             }
 
             if (nextPhase === 'nominating') {
@@ -564,7 +652,8 @@ export const discardPolicy = async (roomId: string, policyToDiscard: PolicyType)
                     lastPolicyEnacted: enactedPolicy,
                     hand: [],
                     policyDiscard: discardPile,
-                    electionTracker: 0
+                    electionTracker: 0,
+                    logs: newLogs
                 });
             } else {
                 // Go to power phase
@@ -575,7 +664,8 @@ export const discardPolicy = async (roomId: string, policyToDiscard: PolicyType)
                     hand: [],
                     policyDiscard: discardPile,
                     turnPhase: nextPhase,
-                    electionTracker: 0
+                    electionTracker: 0,
+                    logs: newLogs
                 });
             }
         }

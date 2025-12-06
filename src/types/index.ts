@@ -20,11 +20,19 @@ export interface PlayerRole {
     team: Team;
 }
 
+export interface GameLog {
+    id: string;
+    message: string;
+    type: 'info' | 'success' | 'danger' | 'warning';
+    timestamp: Timestamp;
+}
+
 export type TurnPhase =
     | 'nominating'
     | 'voting'
     | 'legislating_president'
     | 'legislating_chancellor'
+    | 'veto_requested'
     | 'pp_investigate'
     | 'pp_execution'
     | 'pp_special_election'
@@ -55,6 +63,7 @@ export interface Room {
     votes?: Record<string, VoteChoice>;
     investigatedPlayers?: Record<string, Team>; // uid -> team (result of investigation)
     previousPresidentUid?: string | null; // For returning after special election
+    logs: GameLog[];
 }
 
 export interface CurrentElection {
