@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, Skull } from 'lucide-react';
+import { motion } from 'framer-motion';
 import type { Room, Player, PlayerRole, VoteChoice, PolicyType } from '../../types';
 import { Card } from '../ui/Card';
 import { IdentityCard } from './IdentityCard';
@@ -11,6 +12,7 @@ import {
     subscribeToAllPlayerRoles,
     nominateChancellor,
     voteOnGovernment,
+    processVotingResults,
     discardPolicy,
     performInvestigate,
     performExecution,
@@ -362,6 +364,45 @@ export const GameBoard: React.FC<GameBoardProps> = ({ room, players, myPlayer })
                                         NEIN! (No)
                                     </Button>
                                 </div>
+                            </div>
+                        )}
+
+                        {/* Voting Results Phase */}
+                        {room.turnPhase === 'voting_results' && (
+                            <div className="space-y-6 text-center w-full">
+                                <h3 className="text-2xl font-bold text-white uppercase tracking-widest mb-4">Voting Results</h3>
+
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 justify-items-center">
+                                    {players.map((p, index) => {
+                                        const vote = room.votes?.[p.uid];
+                                        if (!p.isAlive) return null;
+
+                                        return (
+                                            <div key={p.uid} className="flex flex-col items-center gap-2">
+                                                <div className="font-bold text-white text-xs">{p.displayName}</div>
+                                                <motion.div
+                                                    initial={{ rotateY: 180, opacity: 0 }}
+                                                    animate={{ rotateY: 0, opacity: 1 }}
+                                                    transition={{ delay: index * 0.3, duration: 0.5 }}
+                                                    className={`w-20 h-28 rounded-lg border-4 flex items-center justify-center font-black text-xl shadow-xl ${vote === 'yes' ? 'bg-blue-600 border-blue-400 text-white' :
+                                                            vote === 'no' ? 'bg-red-600 border-red-400 text-white' : 'bg-slate-700'
+                                                        }`}
+                                                >
+                                                    {vote === 'yes' ? 'JA!' : 'NEIN!'}
+                                                </motion.div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                {isPresident && (
+                                    <Button onClick={() => processVotingResults(room.roomId)} className="mt-8 animate-pulse" size="lg">
+                                        Proceed
+                                    </Button>
+                                )}
+                                {!isPresident && (
+                                    <p className="text-slate-400 mt-4 animate-pulse">Waiting for President to proceed...</p>
+                                )}
                             </div>
                         )}
 
