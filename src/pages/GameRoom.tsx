@@ -77,11 +77,11 @@ const GameLobby: React.FC<{ room: Room; players: Player[]; isHost: boolean }> = 
 
             {isHost ? (
                 <Button
-                    className="w-full py-4 text-xl flex items-center justify-center"
+                    className="w-full py-4 text-xl flex items-center justify-center gap-2"
                     disabled={players.length < room.minPlayers}
                     onClick={handleStart}
                 >
-                    <Play className="w-6 h-6 mr-2" />
+                    <Play className="w-6 h-6" />
                     Initialize Operation
                 </Button>
             ) : (
