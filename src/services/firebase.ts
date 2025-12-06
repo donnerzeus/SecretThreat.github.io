@@ -13,10 +13,18 @@ const firebaseConfig = {
     measurementId: "G-36D4VJQPCY"
 };
 
-import { getAnalytics } from "firebase/analytics";
+import { getAnalytics, isSupported } from "firebase/analytics";
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const functions = getFunctions(app);
-export const analytics = getAnalytics(app);
+
+export let analytics: any = null;
+isSupported().then(yes => {
+    if (yes) {
+        analytics = getAnalytics(app);
+    }
+}).catch(err => {
+    console.warn("Firebase Analytics not supported:", err);
+});
