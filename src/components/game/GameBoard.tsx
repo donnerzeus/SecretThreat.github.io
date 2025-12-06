@@ -35,7 +35,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ room, players, myPlayer })
 
     const isPresident = room.currentPresidentUid === myPlayer.uid;
     const isChancellor = room.currentChancellorUid === myPlayer.uid;
-    const isChancellorCandidate = room.currentChancellorCandidateUid === myPlayer.uid;
+
 
     const handleNominate = async (candidateUid: string) => {
         await nominateChancellor(room.roomId, candidateUid);
