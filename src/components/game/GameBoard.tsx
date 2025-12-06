@@ -104,6 +104,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({ room, players, myPlayer })
 
 
     const handleNominate = async (candidateUid: string) => {
+        if (candidateUid === room.previousPresidentUid) {
+            alert("You cannot nominate the previous President as Chancellor!");
+            return;
+        }
         const candidate = players.find(p => p.uid === candidateUid);
         if (candidate) {
             await nominateChancellor(room.roomId, candidateUid, candidate.displayName);
@@ -352,11 +356,30 @@ export const GameBoard: React.FC<GameBoardProps> = ({ room, players, myPlayer })
 
                         {/* Voting Phase */}
                         {room.turnPhase === 'voting' && (
-                            <div className="space-y-4 text-center">
-                                <p className="text-lg">Vote for Chancellor: <span className="font-bold text-yellow-500">
-                                    {players.find(p => p.uid === room.currentChancellorCandidateUid)?.displayName}
-                                </span></p>
-                                <div className="flex gap-4 justify-center">
+                            <div className="space-y-6 text-center w-full">
+                                <div className="space-y-2">
+                                    <p className="text-lg">Vote for Chancellor: <span className="font-bold text-yellow-500">
+                                        {players.find(p => p.uid === room.currentChancellorCandidateUid)?.displayName}
+                                    </span></p>
+
+                                    {/* Voting Status Grid */}
+                                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 mt-4">
+                                        {players.map(p => {
+                                            if (!p.isAlive) return null;
+                                            const hasVoted = room.votes && room.votes[p.uid];
+                                            return (
+                                                <div key={p.uid} className={`flex flex-col items-center p-2 rounded ${hasVoted ? 'bg-green-900/30 border border-green-500/50' : 'bg-slate-800/50 border border-slate-700'}`}>
+                                                    <span className="text-xs font-bold truncate w-full">{p.displayName}</span>
+                                                    <span className={`text-[10px] uppercase mt-1 ${hasVoted ? 'text-green-400' : 'text-slate-500'}`}>
+                                                        {hasVoted ? 'Voted' : 'Waiting'}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-4 justify-center mt-4">
                                     <Button onClick={() => handleVote('yes')} className="bg-blue-600 hover:bg-blue-700 w-32">
                                         JA! (Yes)
                                     </Button>
@@ -385,7 +408,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ room, players, myPlayer })
                                                     animate={{ rotateY: 0, opacity: 1 }}
                                                     transition={{ delay: index * 0.3, duration: 0.5 }}
                                                     className={`w-20 h-28 rounded-lg border-4 flex items-center justify-center font-black text-xl shadow-xl ${vote === 'yes' ? 'bg-blue-600 border-blue-400 text-white' :
-                                                            vote === 'no' ? 'bg-red-600 border-red-400 text-white' : 'bg-slate-700'
+                                                        vote === 'no' ? 'bg-red-600 border-red-400 text-white' : 'bg-slate-700'
                                                         }`}
                                                 >
                                                     {vote === 'yes' ? 'JA!' : 'NEIN!'}

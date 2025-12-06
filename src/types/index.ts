@@ -55,6 +55,8 @@ export interface Room {
     currentPresidentUid: string | null;
     currentChancellorCandidateUid: string | null;
     currentChancellorUid: string | null;
+    previousPresidentUid?: string | null;
+    previousChancellorUid?: string | null;
     winner: Team | null;
     lastPolicyEnacted: PolicyType | null;
     vetoPowerUnlocked: boolean;
@@ -63,7 +65,7 @@ export interface Room {
     hand?: PolicyType[];
     votes?: Record<string, VoteChoice>;
     investigatedPlayers?: Record<string, Team>; // uid -> team (result of investigation)
-    previousPresidentUid?: string | null; // For returning after special election
+
     logs: GameLog[];
 }
 

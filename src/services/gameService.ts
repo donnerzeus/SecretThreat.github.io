@@ -438,6 +438,8 @@ const endTurn = async (transaction: any, roomRef: any, room: Room) => {
     const nextPresident = room.playerOrder[nextIdx];
 
     transaction.update(roomRef, {
+        previousPresidentUid: room.currentPresidentUid,
+        previousChancellorUid: room.currentChancellorUid,
         currentPresidentUid: nextPresident,
         currentChancellorCandidateUid: null,
         currentChancellorUid: null,
