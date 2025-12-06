@@ -11,7 +11,8 @@ import {
     discardPolicy,
     performInvestigate,
     performExecution,
-    performSpecialElection
+    performSpecialElection,
+    endPeek
 } from '../../services/gameService';
 
 interface GameBoardProps {
@@ -35,6 +36,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ room, players, myPlayer })
 
     const isPresident = room.currentPresidentUid === myPlayer.uid;
     const isChancellor = room.currentChancellorUid === myPlayer.uid;
+
 
 
     const handleNominate = async (candidateUid: string) => {
@@ -61,6 +63,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({ room, players, myPlayer })
 
     const handleSpecialElection = async (targetUid: string) => {
         await performSpecialElection(room.roomId, targetUid);
+    };
+
+    const handleEndPeek = async () => {
+        await endPeek(room.roomId);
     };
 
     return (
@@ -199,6 +205,30 @@ export const GameBoard: React.FC<GameBoardProps> = ({ room, players, myPlayer })
                                 );
                             })}
                         </div>
+                    </div>
+                )}
+
+                {/* Presidential Power: Peek */}
+                {room.turnPhase === 'pp_peek' && isPresident && (
+                    <div className="space-y-4 text-center">
+                        <h3 className="text-lg font-bold text-white">Policy Peek</h3>
+                        <p className="text-slate-300">Top 3 policies in the deck (Private):</p>
+                        <div className="flex justify-center gap-4">
+                            {room.policyDeck?.slice(0, 3).map((policy, idx) => (
+                                <div
+                                    key={idx}
+                                    className={`w-24 h-36 rounded-lg border-2 flex items-center justify-center font-bold text-sm ${policy === 'Guardian'
+                                        ? 'bg-blue-900 border-blue-500 text-blue-200'
+                                        : 'bg-red-900 border-red-500 text-red-200'
+                                        }`}
+                                >
+                                    {policy}
+                                </div>
+                            ))}
+                        </div>
+                        <Button onClick={handleEndPeek} className="w-full mt-4">
+                            End Peek
+                        </Button>
                     </div>
                 )}
 

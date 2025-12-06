@@ -64,6 +64,9 @@ export const Login: React.FC = () => {
                         </Button>
                     </form>
                 </Card>
+                <div className="mt-8 text-slate-600 text-sm font-mono">
+                    Developed by Donnerzeus
+                </div>
             </div>
         </Layout>
     );

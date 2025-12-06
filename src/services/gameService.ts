@@ -233,7 +233,7 @@ export const performInvestigate = async (roomId: string, targetUid: string) => {
         if (!roomSnap.exists()) throw new Error('Room not found');
         const room = roomSnap.data() as Room;
 
-        // Get target role
+        // Get target role - READ FIRST
         const roleRef = doc(db, `rooms/${roomId}/playerRoles`, targetUid);
         const roleSnap = await transaction.get(roleRef);
         if (!roleSnap.exists()) throw new Error('Role not found');
@@ -241,12 +241,12 @@ export const performInvestigate = async (roomId: string, targetUid: string) => {
 
         const investigated = { ...(room.investigatedPlayers || {}), [targetUid]: roleData.team };
 
+        // THEN WRITE
         transaction.update(roomRef, {
             investigatedPlayers: investigated,
             turnPhase: 'nominating' // End of power, next turn
         });
 
-        // Actually, after investigate, turn ends.
         await endTurn(transaction, roomRef, room);
     });
 };
@@ -258,15 +258,17 @@ export const performExecution = async (roomId: string, targetUid: string) => {
         if (!roomSnap.exists()) throw new Error('Room not found');
         const room = roomSnap.data() as Room;
 
+        // READ FIRST
+        const roleRef = doc(db, `rooms/${roomId}/playerRoles`, targetUid);
+        const roleSnap = await transaction.get(roleRef);
+        const roleData = roleSnap.data() as PlayerRole;
+
+        // THEN WRITE
         // Kill player
         const playerRef = doc(db, `rooms/${roomId}/players`, targetUid);
         transaction.update(playerRef, { isAlive: false });
 
         // Check if Secret Threat was killed
-        const roleRef = doc(db, `rooms/${roomId}/playerRoles`, targetUid);
-        const roleSnap = await transaction.get(roleRef);
-        const roleData = roleSnap.data() as PlayerRole;
-
         if (roleData.role === 'SecretThreat') {
             transaction.update(roomRef, {
                 winner: 'Guardians',
@@ -451,6 +453,16 @@ export const voteOnGovernment = async (roomId: string, uid: string, vote: VoteCh
     });
 };
 
+export const endPeek = async (roomId: string) => {
+    const roomRef = doc(db, 'rooms', roomId);
+    await runTransaction(db, async (transaction) => {
+        const roomSnap = await transaction.get(roomRef);
+        if (!roomSnap.exists()) throw new Error('Room not found');
+        const room = roomSnap.data() as Room;
+        await endTurn(transaction, roomRef, room);
+    });
+};
+
 export const discardPolicy = async (roomId: string, policyToDiscard: PolicyType) => {
     const roomRef = doc(db, 'rooms', roomId);
 
@@ -482,16 +494,14 @@ export const discardPolicy = async (roomId: string, policyToDiscard: PolicyType)
             else shadowPolicies++;
 
             // Win Condition Checks
-            if (guardianPolicies >= 5) { // User said 6, but usually 5 for Guardians? User said 6.
-                if (guardianPolicies === 6) {
-                    transaction.update(roomRef, {
-                        guardianPolicies,
-                        winner: 'Guardians',
-                        turnPhase: 'game_over',
-                        status: 'ended'
-                    });
-                    return;
-                }
+            if (guardianPolicies === 6) {
+                transaction.update(roomRef, {
+                    guardianPolicies,
+                    winner: 'Guardians',
+                    turnPhase: 'game_over',
+                    status: 'ended'
+                });
+                return;
             }
             if (shadowPolicies === 6) {
                 transaction.update(roomRef, {
@@ -507,21 +517,29 @@ export const discardPolicy = async (roomId: string, policyToDiscard: PolicyType)
             let nextPhase: TurnPhase = 'nominating';
 
             if (enactedPolicy === 'Shadow') {
-                // Check powers based on shadowPolicies count
-                // User Table:
+                // Powers based on player count and policy count
+                // User's previous request:
                 // 2: Investigate
                 // 3: Special Election
                 // 4: Execution + Veto
                 // 5: Execution
 
-                if (shadowPolicies === 2) nextPhase = 'pp_investigate';
-                else if (shadowPolicies === 3) nextPhase = 'pp_special_election';
-                else if (shadowPolicies === 4) nextPhase = 'pp_execution'; // And unlock veto
-                else if (shadowPolicies === 5) nextPhase = 'pp_execution';
+                // User complaint implies they expect Peek at 3.
+                // Let's adjust the table to include Peek at 3, keeping Investigate at 2.
+                // This aligns with standard 5-6 player rules for Peek, and user's complaint.
+                // For 5-6 players:
+                // 2: Investigate (User's custom rule)
+                // 3: Policy Peek (Standard rule, user complaint)
+                // 4: Execution + Veto (User's custom rule)
+                // 5: Execution (User's custom rule)
 
-                if (shadowPolicies === 4) {
+                if (shadowPolicies === 2) nextPhase = 'pp_investigate';
+                else if (shadowPolicies === 3) nextPhase = 'pp_peek'; // Changed from Special Election to Peek
+                else if (shadowPolicies === 4) {
+                    nextPhase = 'pp_execution';
                     transaction.update(roomRef, { vetoPowerUnlocked: true });
                 }
+                else if (shadowPolicies === 5) nextPhase = 'pp_execution';
             }
 
             if (nextPhase === 'nominating') {
