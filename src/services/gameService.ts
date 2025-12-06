@@ -476,8 +476,25 @@ export const voteOnGovernment = async (roomId: string, uid: string, vote: VoteCh
             return;
         }
 
-        const yesVotes = Object.values(newVotes).filter(v => v === 'yes').length;
-        const noVotes = Object.values(newVotes).filter(v => v === 'no').length;
+        // All voted -> Go to results
+        transaction.update(roomRef, {
+            votes: newVotes,
+            turnPhase: 'voting_results',
+            logs: [...(room.logs || []), createLog("Voting closed. Revealing votes...", "info")]
+        });
+    });
+};
+
+export const processVotingResults = async (roomId: string) => {
+    const roomRef = doc(db, 'rooms', roomId);
+
+    await runTransaction(db, async (transaction) => {
+        const roomSnap = await transaction.get(roomRef);
+        if (!roomSnap.exists()) throw new Error('Room not found');
+        const room = roomSnap.data() as Room;
+
+        const yesVotes = Object.values(room.votes || {}).filter(v => v === 'yes').length;
+        const noVotes = Object.values(room.votes || {}).filter(v => v === 'no').length;
 
         if (yesVotes > noVotes) {
             // Check Secret Threat Chancellor Win Condition
@@ -509,7 +526,6 @@ export const voteOnGovernment = async (roomId: string, uid: string, vote: VoteCh
             const hand = deck.splice(0, 3);
 
             transaction.update(roomRef, {
-                votes: newVotes,
                 currentChancellorUid: room.currentChancellorCandidateUid,
                 turnPhase: 'legislating_president',
                 policyDeck: deck,
@@ -565,7 +581,6 @@ export const voteOnGovernment = async (roomId: string, uid: string, vote: VoteCh
             } else {
                 // Just next president
                 transaction.update(roomRef, {
-                    votes: newVotes,
                     electionTracker: tracker,
                     logs: [...(room.logs || []), createLog("Vote Failed! Election Tracker advanced.", "warning")]
                 });

@@ -37,6 +37,7 @@ export type TurnPhase =
     | 'pp_execution'
     | 'pp_special_election'
     | 'pp_peek'
+    | 'voting_results'
     | 'game_over';
 
 export interface Room {
