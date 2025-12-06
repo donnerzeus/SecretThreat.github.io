@@ -6,16 +6,21 @@ interface ActionLogProps {
 }
 
 export const ActionLog: React.FC<ActionLogProps> = ({ logs }) => {
-    const bottomRef = useRef<HTMLDivElement>(null);
+    const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+        if (scrollRef.current) {
+            scrollRef.current.scrollTo({
+                top: scrollRef.current.scrollHeight,
+                behavior: 'smooth'
+            });
+        }
     }, [logs]);
 
     return (
         <div className="bg-slate-900/80 border border-slate-700 rounded-lg p-4 h-48 flex flex-col">
             <h3 className="text-xs font-bold text-slate-400 uppercase mb-2">Mission Log</h3>
-            <div className="flex-1 overflow-y-auto space-y-2 pr-2 text-sm font-mono scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-transparent">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-2 pr-2 text-sm font-mono scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-transparent">
                 {logs.length === 0 && <p className="text-slate-600 italic">No activity recorded.</p>}
                 {logs.map((log) => (
                     <div key={log.id} className={`
@@ -31,7 +36,6 @@ export const ActionLog: React.FC<ActionLogProps> = ({ logs }) => {
                         {log.message}
                     </div>
                 ))}
-                <div ref={bottomRef} />
             </div>
         </div>
     );
