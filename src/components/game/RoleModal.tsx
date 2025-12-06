@@ -52,7 +52,13 @@ export const RoleModal: React.FC<RoleModalProps> = ({ role, team, teammates, sec
                             <li>You have no special intel. Trust no one.</li>
                         )}
                         {role === 'SecretThreat' && (
-                            <li>You do not know who your fellow Shadows are. Play along.</li>
+                            <>
+                                {teammates && teammates.length > 0 ? (
+                                    <li className="text-red-300">Your Minions (Shadows): {teammates.join(', ')}</li>
+                                ) : (
+                                    <li>You do not know who your fellow Shadows are. Play along.</li>
+                                )}
+                            </>
                         )}
                         {role === 'Shadow' && (
                             <>

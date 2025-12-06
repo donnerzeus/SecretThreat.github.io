@@ -47,6 +47,51 @@ export const GameBoard: React.FC<GameBoardProps> = ({ room, players, myPlayer })
     const myRole = roleData?.role || 'Guardian'; // Default to Guardian while loading
     const myTeam = roleData?.team || 'Guardians';
 
+    // Intel Logic
+    const [intel, setIntel] = useState<{ teammates: string[], secretThreatName?: string }>({ teammates: [] });
+
+    useEffect(() => {
+        if (!roleData || roleData.role === 'Guardian') return;
+
+        const unsubscribe = subscribeToAllPlayerRoles(room.roomId, (allRoles) => {
+            const newIntel: { teammates: string[], secretThreatName?: string } = { teammates: [] };
+            const playerCount = players.length;
+
+            if (roleData.role === 'Shadow') {
+                // Shadows always know Secret Threat and other Shadows
+                const shadows: string[] = [];
+                Object.values(allRoles).forEach(r => {
+                    const p = players.find(pl => pl.uid === r.uid);
+                    if (!p) return;
+
+                    if (r.role === 'SecretThreat') {
+                        newIntel.secretThreatName = p.displayName;
+                    } else if (r.role === 'Shadow' && r.uid !== myPlayer.uid) {
+                        shadows.push(p.displayName);
+                    }
+                });
+                newIntel.teammates = shadows;
+            } else if (roleData.role === 'SecretThreat') {
+                // Secret Threat knows Shadows ONLY if player count <= 6
+                if (playerCount <= 6) {
+                    const shadows: string[] = [];
+                    Object.values(allRoles).forEach(r => {
+                        const p = players.find(pl => pl.uid === r.uid);
+                        if (!p) return;
+
+                        if (r.role === 'Shadow') {
+                            shadows.push(p.displayName);
+                        }
+                    });
+                    newIntel.teammates = shadows;
+                }
+            }
+            setIntel(newIntel);
+        });
+
+        return () => unsubscribe();
+    }, [room.roomId, roleData?.role, players.length]);
+
     const isPresident = room.currentPresidentUid === myPlayer.uid;
     const isChancellor = room.currentChancellorUid === myPlayer.uid;
 
@@ -146,7 +191,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({ room, players, myPlayer })
             {/* Role Info & Identity Card */}
             {roleData && (
                 <>
-                    <RoleModal role={myRole} team={myTeam} onConfirm={() => { }} />
+                    <RoleModal
+                        role={myRole}
+                        team={myTeam}
+                        teammates={intel.teammates}
+                        secretThreatName={intel.secretThreatName}
+                        onConfirm={() => { }}
+                    />
                     <IdentityCard role={myRole} team={myTeam} />
                 </>
             )}
