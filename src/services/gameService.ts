@@ -217,12 +217,24 @@ export const startGame = async (roomId: string) => {
 };
 
 export const subscribeToPlayerRole = (roomId: string, uid: string, callback: (role: PlayerRole | null) => void) => {
-    return onSnapshot(doc(db, `rooms/${roomId}/playerRoles`, uid), (doc) => {
+    const roleRef = doc(db, 'rooms', roomId, 'playerRoles', uid);
+    return onSnapshot(roleRef, (doc) => {
         if (doc.exists()) {
             callback(doc.data() as PlayerRole);
         } else {
             callback(null);
         }
+    });
+};
+
+export const subscribeToAllPlayerRoles = (roomId: string, callback: (roles: Record<string, PlayerRole>) => void) => {
+    const rolesRef = collection(db, 'rooms', roomId, 'playerRoles');
+    return onSnapshot(rolesRef, (snapshot) => {
+        const roles: Record<string, PlayerRole> = {};
+        snapshot.forEach(doc => {
+            roles[doc.id] = doc.data() as PlayerRole;
+        });
+        callback(roles);
     });
 };
 

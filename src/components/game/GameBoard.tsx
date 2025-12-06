@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Room, Player, PlayerRole, VoteChoice, PolicyType } from '../../types';
 import { Card } from '../ui/Card';
 import { IdentityCard } from './IdentityCard';
@@ -6,6 +7,7 @@ import { RoleModal } from './RoleModal';
 import { Button } from '../ui/Button';
 import {
     subscribeToPlayerRole,
+    subscribeToAllPlayerRoles,
     nominateChancellor,
     voteOnGovernment,
     discardPolicy,
@@ -22,7 +24,9 @@ interface GameBoardProps {
 }
 
 export const GameBoard: React.FC<GameBoardProps> = ({ room, players, myPlayer }) => {
+    const navigate = useNavigate();
     const [roleData, setRoleData] = useState<PlayerRole | null>(null);
+    const [allRoles, setAllRoles] = useState<Record<string, PlayerRole> | null>(null);
 
     useEffect(() => {
         const unsubscribe = subscribeToPlayerRole(room.roomId, myPlayer.uid, (data) => {
@@ -30,6 +34,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({ room, players, myPlayer })
         });
         return () => unsubscribe();
     }, [room.roomId, myPlayer.uid]);
+
+    useEffect(() => {
+        if (room.turnPhase === 'game_over') {
+            const unsubscribe = subscribeToAllPlayerRoles(room.roomId, (data) => {
+                setAllRoles(data);
+            });
+            return () => unsubscribe();
+        }
+    }, [room.roomId, room.turnPhase]);
 
     const myRole = roleData?.role || 'Guardian'; // Default to Guardian while loading
     const myTeam = roleData?.team || 'Guardians';
@@ -69,6 +82,65 @@ export const GameBoard: React.FC<GameBoardProps> = ({ room, players, myPlayer })
         await endPeek(room.roomId);
     };
 
+    if (room.turnPhase === 'game_over') {
+        return (
+            <div className="w-full max-w-4xl mx-auto p-4 space-y-8">
+                <Card className="bg-slate-900/90 border-yellow-500/50 text-center p-8">
+                    <h1 className="text-5xl font-black text-yellow-500 uppercase mb-4 animate-pulse">
+                        {room.winner} WIN!
+                    </h1>
+                    <p className="text-slate-400 mb-8">The game has ended.</p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
+                        <div>
+                            <h3 className="text-xl font-bold text-white mb-4 border-b border-slate-700 pb-2">Mission Report</h3>
+                            <div className="space-y-2">
+                                <div className="flex justify-between">
+                                    <span className="text-blue-400">Guardian Policies:</span>
+                                    <span className="font-bold text-white">{room.guardianPolicies}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-red-400">Shadow Policies:</span>
+                                    <span className="font-bold text-white">{room.shadowPolicies}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 className="text-xl font-bold text-white mb-4 border-b border-slate-700 pb-2">Operative Identities</h3>
+                            <div className="space-y-3">
+                                {players.map(p => {
+                                    const role = allRoles?.[p.uid];
+                                    return (
+                                        <div key={p.uid} className="flex items-center justify-between bg-slate-800 p-2 rounded">
+                                            <span className="font-medium text-white">{p.displayName}</span>
+                                            {role ? (
+                                                <span className={`text-sm font-bold px-2 py-1 rounded ${role.role === 'SecretThreat' ? 'bg-red-900 text-red-200' :
+                                                    role.team === 'Shadows' ? 'bg-red-900/50 text-red-300' :
+                                                        'bg-blue-900/50 text-blue-300'
+                                                    }`}>
+                                                    {role.role === 'SecretThreat' ? 'SECRET THREAT' : role.role.toUpperCase()}
+                                                </span>
+                                            ) : (
+                                                <span className="text-slate-500 text-xs">Revealing...</span>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-12">
+                        <Button onClick={() => navigate('/lobby')} size="lg" className="w-full md:w-auto px-12">
+                            Return to Lobby
+                        </Button>
+                    </div>
+                </Card>
+            </div>
+        );
+    }
+
     return (
         <div className="w-full max-w-6xl mx-auto p-2 space-y-6 pb-24">
             {/* Role Info & Identity Card */}
@@ -98,7 +170,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ room, players, myPlayer })
                 </div>
 
                 {/* Game Over - Show Roles */}
-                {room.turnPhase === 'game_over' && (
+                {(room.turnPhase as string) === 'game_over' && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                         {/* We can't show everyone's role easily without fetching all roles. 
                             For now, just showing the winner is enough or we need to fetch all roles.
