@@ -98,40 +98,39 @@ export const GameRoom: React.FC = () => {
     const navigate = useNavigate();
     const [room, setRoom] = useState<Room | null>(null);
     const [players, setPlayers] = useState<Player[]>([]);
-    const [loading, setLoading] = useState(true);
+
 
     useEffect(() => {
         if (!roomId) return;
-        const unsubRoom = subscribeToRoom(roomId, (data) => {
-            setRoom(data);
-            setLoading(false);
+
+        const unsubscribeRoom = subscribeToRoom(roomId, (roomData) => {
+            if (!roomData) {
+                // Room doesn't exist or deleted
+                navigate('/lobby');
+                return;
+            }
+            setRoom(roomData);
         });
-        const unsubPlayers = subscribeToPlayers(roomId, (data) => {
-            setPlayers(data);
+
+        const unsubscribePlayers = subscribeToPlayers(roomId, (playersData) => {
+            setPlayers(playersData);
         });
+
         return () => {
-            unsubRoom();
-            unsubPlayers();
+            unsubscribeRoom();
+            unsubscribePlayers();
         };
-    }, [roomId]);
+    }, [roomId, navigate]);
 
-    if (loading) {
+    if (!room || !players.length) {
         return (
             <Layout>
-                <div className="flex flex-col items-center text-slate-400">
-                    <Loader2 className="w-10 h-10 animate-spin mb-4" />
-                    <p>Establishing secure connection...</p>
-                </div>
-            </Layout>
-        );
-    }
-
-    if (!room) {
-        return (
-            <Layout>
-                <div className="text-center">
-                    <h2 className="text-2xl text-red-500 mb-4">Operation Not Found</h2>
-                    <Button onClick={() => navigate('/lobby')}>Return to HQ</Button>
+                <div className="min-h-[50vh] flex flex-col items-center justify-center text-white">
+                    <Loader2 className="w-10 h-10 animate-spin mb-4 text-blue-500" />
+                    <div className="text-center">
+                        <h2 className="text-2xl font-bold mb-2">Loading Operation...</h2>
+                        <p className="text-slate-400">Connecting to secure channel {roomId}</p>
+                    </div>
                 </div>
             </Layout>
         );
