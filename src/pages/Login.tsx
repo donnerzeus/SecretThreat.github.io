@@ -64,8 +64,10 @@ export const Login: React.FC = () => {
                         </Button>
                     </form>
                 </Card>
-                <div className="mt-8 text-slate-600 text-sm font-mono">
-                    Developed by Donnerzeus
+                <div className="mt-8 text-slate-600 text-sm font-mono flex items-center gap-2">
+                    <span>Developed by Donnerzeus</span>
+                    <span className="w-1 h-1 rounded-full bg-slate-600"></span>
+                    <span className="text-slate-500">v1.0.0</span>
                 </div>
             </div>
         </Layout>

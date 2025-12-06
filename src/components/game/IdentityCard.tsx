@@ -13,7 +13,7 @@ export const IdentityCard: React.FC<IdentityCardProps> = ({ role, team }) => {
     const [isFlipped, setIsFlipped] = useState(false);
 
     return (
-        <div className="fixed bottom-4 right-4 z-50">
+        <div className="relative mx-auto mb-6 md:fixed md:bottom-4 md:right-4 md:z-50 md:mb-0 flex justify-center md:block">
             <div className="relative w-32 h-48 cursor-pointer perspective-1000" onClick={() => setIsFlipped(!isFlipped)}>
                 <motion.div
                     className="w-full h-full relative preserve-3d transition-transform duration-500"
