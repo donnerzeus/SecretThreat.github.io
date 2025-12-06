@@ -18,6 +18,7 @@ import {
     performExecution,
     performSpecialElection,
     endPeek,
+    endInvestigation,
     requestVeto,
     respondToVeto
 } from '../../services/gameService';
@@ -366,6 +367,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({ room, players, myPlayer })
                                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 mt-4">
                                         {players.map(p => {
                                             if (!p.isAlive) return null;
+                                            // President doesn't vote
+                                            if (p.uid === room.currentPresidentUid) return null;
+
                                             const hasVoted = room.votes && room.votes[p.uid];
                                             return (
                                                 <div key={p.uid} className={`flex flex-col items-center p-2 rounded ${hasVoted ? 'bg-green-900/30 border border-green-500/50' : 'bg-slate-800/50 border border-slate-700'}`}>
@@ -379,14 +383,39 @@ export const GameBoard: React.FC<GameBoardProps> = ({ room, players, myPlayer })
                                     </div>
                                 </div>
 
-                                <div className="flex gap-4 justify-center mt-4">
-                                    <Button onClick={() => handleVote('yes')} className="bg-blue-600 hover:bg-blue-700 w-32">
-                                        JA! (Yes)
-                                    </Button>
-                                    <Button onClick={() => handleVote('no')} className="bg-red-600 hover:bg-red-700 w-32">
-                                        NEIN! (No)
-                                    </Button>
-                                </div>
+                                {isPresident ? (
+                                    <div className="p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+                                        <p className="text-slate-400 italic">As President, you cannot vote in this election.</p>
+                                        <p className="text-xs text-slate-500 mt-1">Waiting for other players...</p>
+                                    </div>
+                                ) : (
+                                    <div className="flex gap-4 justify-center mt-4">
+                                        <Button
+                                            onClick={() => handleVote('yes')}
+                                            disabled={!!room.votes?.[myPlayer.uid]}
+                                            className={`w-32 transition-all ${room.votes?.[myPlayer.uid] === 'yes'
+                                                ? 'bg-blue-600 ring-4 ring-blue-400 ring-opacity-50 scale-105'
+                                                : room.votes?.[myPlayer.uid]
+                                                    ? 'bg-slate-700 opacity-50 cursor-not-allowed'
+                                                    : 'bg-blue-600 hover:bg-blue-700'
+                                                }`}
+                                        >
+                                            {room.votes?.[myPlayer.uid] === 'yes' ? 'VOTED JA!' : 'JA! (Yes)'}
+                                        </Button>
+                                        <Button
+                                            onClick={() => handleVote('no')}
+                                            disabled={!!room.votes?.[myPlayer.uid]}
+                                            className={`w-32 transition-all ${room.votes?.[myPlayer.uid] === 'no'
+                                                ? 'bg-red-600 ring-4 ring-red-400 ring-opacity-50 scale-105'
+                                                : room.votes?.[myPlayer.uid]
+                                                    ? 'bg-slate-700 opacity-50 cursor-not-allowed'
+                                                    : 'bg-red-600 hover:bg-red-700'
+                                                }`}
+                                        >
+                                            {room.votes?.[myPlayer.uid] === 'no' ? 'VOTED NEIN!' : 'NEIN! (No)'}
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -484,6 +513,32 @@ export const GameBoard: React.FC<GameBoardProps> = ({ room, players, myPlayer })
                                         );
                                     })}
                                 </div>
+                            </div>
+                        )}
+
+                        {/* Investigation Result */}
+                        {room.turnPhase === 'pp_investigate_result' && isPresident && (
+                            <div className="space-y-6 text-center">
+                                <h3 className="text-2xl font-bold text-white uppercase tracking-widest">Investigation Result</h3>
+
+                                <div className="space-y-4">
+                                    {Object.entries(room.investigatedPlayers || {}).map(([uid, team]) => {
+                                        const p = players.find(pl => pl.uid === uid);
+                                        if (!p) return null;
+                                        return (
+                                            <div key={uid} className="bg-slate-800 p-4 rounded border border-slate-600 animate-fade-in">
+                                                <p className="text-lg font-bold text-slate-300">{p.displayName}</p>
+                                                <p className={`text-2xl font-black uppercase mt-2 ${team === 'Guardians' ? 'text-blue-400' : 'text-red-500'}`}>
+                                                    {team === 'Guardians' ? 'Guardian' : 'Shadow'}
+                                                </p>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                <Button onClick={() => endInvestigation(room.roomId)} className="w-full max-w-xs mx-auto mt-8" size="lg">
+                                    Continue
+                                </Button>
                             </div>
                         )}
 

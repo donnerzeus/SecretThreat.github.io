@@ -342,10 +342,18 @@ export const performInvestigate = async (roomId: string, targetUid: string) => {
         // THEN WRITE
         transaction.update(roomRef, {
             investigatedPlayers: investigated,
-            turnPhase: 'nominating', // End of power, next turn
+            turnPhase: 'pp_investigate_result', // Show result
             logs: [...(room.logs || []), createLog(`President investigated ${playerName}.`, "info")]
         });
+    });
+};
 
+export const endInvestigation = async (roomId: string) => {
+    const roomRef = doc(db, 'rooms', roomId);
+    await runTransaction(db, async (transaction) => {
+        const roomSnap = await transaction.get(roomRef);
+        if (!roomSnap.exists()) throw new Error('Room not found');
+        const room = roomSnap.data() as Room;
         await endTurn(transaction, roomRef, room);
     });
 };
@@ -468,12 +476,29 @@ export const voteOnGovernment = async (roomId: string, uid: string, vote: VoteCh
         if (!roomSnap.exists()) throw new Error('Room not found');
         const room = roomSnap.data() as Room;
 
-        const newVotes = { ...room.votes, [uid]: vote };
+        if (uid === room.currentPresidentUid) {
+            throw new Error("President cannot vote!");
+        }
 
-        const playerCount = room.playerOrder.length;
+        // Calculate required votes (Alive players - President)
+        let aliveCount = 0;
+        for (const pUid of room.playerOrder) {
+            const pRef = doc(db, 'rooms', roomId, 'players', pUid);
+            const pSnap = await transaction.get(pRef);
+            if (pSnap.exists() && pSnap.data().isAlive) {
+                aliveCount++;
+            }
+        }
+
+        const newVotes = { ...room.votes, [uid]: vote };
         const voteCount = Object.keys(newVotes).length;
 
-        if (voteCount < playerCount) {
+        // President cannot vote, so required is aliveCount - 1
+        // If President is dead (unlikely as they are current president), logic still holds (they are not in aliveCount)
+        // But President MUST be alive to be President.
+        const requiredVotes = aliveCount - 1;
+
+        if (voteCount < requiredVotes) {
             transaction.update(roomRef, { votes: newVotes });
             return;
         }

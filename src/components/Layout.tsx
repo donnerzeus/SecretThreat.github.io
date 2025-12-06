@@ -8,7 +8,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                 {children}
             </div>
             <div className="absolute bottom-2 right-2 text-xs text-slate-600 opacity-50">
-                v1.0.1
+                v1.0.2
             </div>
         </div>
     );

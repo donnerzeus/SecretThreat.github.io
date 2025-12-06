@@ -34,6 +34,7 @@ export type TurnPhase =
     | 'legislating_chancellor'
     | 'veto_requested'
     | 'pp_investigate'
+    | 'pp_investigate_result'
     | 'pp_execution'
     | 'pp_special_election'
     | 'pp_peek'
