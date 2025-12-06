@@ -77,7 +77,7 @@ const GameLobby: React.FC<{ room: Room; players: Player[]; isHost: boolean }> = 
 
             {isHost ? (
                 <Button
-                    className="w-full py-4 text-xl"
+                    className="w-full py-4 text-xl flex items-center justify-center"
                     disabled={players.length < room.minPlayers}
                     onClick={handleStart}
                 >
