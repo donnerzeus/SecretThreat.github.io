@@ -453,8 +453,7 @@ const endTurn = async (transaction: any, roomRef: any, room: Room) => {
         currentChancellorUid: null,
         turnPhase: 'nominating',
         votes: {},
-        electionTracker: 0 // Reset on successful turn? Or only on successful vote?
-        // Rules: Election tracker resets when a policy is enacted (which happens before endTurn usually).
+        // electionTracker: 0 // REMOVED: Managed by callers
     });
 };
 
