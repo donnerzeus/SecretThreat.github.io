@@ -20,10 +20,22 @@ export interface PlayerRole {
     team: Team;
 }
 
+export type TurnPhase =
+    | 'nominating'
+    | 'voting'
+    | 'legislating_president'
+    | 'legislating_chancellor'
+    | 'pp_investigate'
+    | 'pp_execution'
+    | 'pp_special_election'
+    | 'pp_peek'
+    | 'game_over';
+
 export interface Room {
     roomId: string;
     hostUid: string;
     status: GameStatus;
+    turnPhase?: TurnPhase;
     createdAt: Timestamp;
     minPlayers: number;
     maxPlayers: number;
@@ -37,6 +49,12 @@ export interface Room {
     winner: Team | null;
     lastPolicyEnacted: PolicyType | null;
     vetoPowerUnlocked: boolean;
+    policyDeck?: PolicyType[];
+    policyDiscard?: PolicyType[];
+    hand?: PolicyType[];
+    votes?: Record<string, VoteChoice>;
+    investigatedPlayers?: Record<string, Team>; // uid -> team (result of investigation)
+    previousPresidentUid?: string | null; // For returning after special election
 }
 
 export interface CurrentElection {
