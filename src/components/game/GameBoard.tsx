@@ -24,6 +24,7 @@ import {
     forceEndVoting
 } from '../../services/gameService';
 import { ActionLog } from './ActionLog';
+import confetti from 'canvas-confetti';
 
 interface GameBoardProps {
     room: Room;
@@ -59,6 +60,62 @@ export const GameBoard: React.FC<GameBoardProps> = ({ room, players, myPlayer })
     const [intel, setIntel] = useState<{ teammates: string[], secretThreatName?: string }>({ teammates: [] });
 
     useEffect(() => {
+        if (room.turnPhase === 'game_over') {
+            const duration = 3000;
+            const end = Date.now() + duration;
+
+            const frame = () => {
+                confetti({
+                    particleCount: 2,
+                    angle: 60,
+                    spread: 55,
+                    origin: { x: 0 },
+                    colors: room.winner === 'Guardians' ? ['#3b82f6', '#60a5fa'] : ['#ef4444', '#f87171']
+                });
+                confetti({
+                    particleCount: 2,
+                    angle: 120,
+                    spread: 55,
+                    origin: { x: 1 },
+                    colors: room.winner === 'Guardians' ? ['#3b82f6', '#60a5fa'] : ['#ef4444', '#f87171']
+                });
+
+                if (Date.now() < end) {
+                    requestAnimationFrame(frame);
+                }
+            };
+            frame();
+        } else if (room.turnPhase === 'legislating_president') {
+            // Vote passed
+            confetti({
+                particleCount: 100,
+                spread: 70,
+                origin: { y: 0.6 }
+            });
+        }
+    }, [room.turnPhase, room.winner]);
+
+    useEffect(() => {
+        // GHOST MODE: If dead, see everything
+        if (!myPlayer.isAlive) {
+            const unsubscribe = subscribeToAllPlayerRoles(room.roomId, (allRoles) => {
+                const newIntel: { teammates: string[], secretThreatName?: string } = { teammates: [] };
+
+                Object.values(allRoles).forEach(r => {
+                    const p = players.find(pl => pl.uid === r.uid);
+                    if (!p) return;
+
+                    if (r.role === 'SecretThreat') {
+                        newIntel.secretThreatName = p.displayName;
+                    } else {
+                        newIntel.teammates.push(`${p.displayName} (${r.role})`);
+                    }
+                });
+                setIntel(newIntel);
+            });
+            return () => unsubscribe();
+        }
+
         if (!roleData || roleData.role === 'Guardian') return;
 
         const unsubscribe = subscribeToAllPlayerRoles(room.roomId, (allRoles) => {
@@ -98,7 +155,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ room, players, myPlayer })
         });
 
         return () => unsubscribe();
-    }, [room.roomId, roleData?.role, players.length]);
+    }, [roleData, room.roomId, players, myPlayer.uid, myPlayer.isAlive]);
 
     const isPresident = room.currentPresidentUid === myPlayer.uid;
     const isChancellor = room.currentChancellorUid === myPlayer.uid;
@@ -467,8 +524,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({ room, players, myPlayer })
                                                     animate={{ rotateY: 0, opacity: 1 }}
                                                     transition={{ delay: index * 0.3, duration: 0.5 }}
                                                     className={`w-20 h-28 rounded-lg border-4 flex items-center justify-center font-black text-xl shadow-xl ${isPlayerPresident ? 'bg-yellow-600/50 border-yellow-500 text-yellow-200' :
-                                                            vote === 'yes' ? 'bg-blue-600 border-blue-400 text-white' :
-                                                                vote === 'no' ? 'bg-red-600 border-red-400 text-white' : 'bg-slate-700'
+                                                        vote === 'yes' ? 'bg-blue-600 border-blue-400 text-white' :
+                                                            vote === 'no' ? 'bg-red-600 border-red-400 text-white' : 'bg-slate-700'
                                                         }`}
                                                 >
                                                     {isPlayerPresident ? 'PRES' : (vote === 'yes' ? 'JA!' : 'NEIN!')}
