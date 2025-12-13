@@ -95,6 +95,16 @@ export const GameBoard: React.FC<GameBoardProps> = ({ room, players, myPlayer })
         }
     }, [room.turnPhase, room.winner]);
 
+    const [showTutorial, setShowTutorial] = useState(() => {
+        return localStorage.getItem('st_showTutorial') !== 'false';
+    });
+
+    const toggleTutorial = () => {
+        const newVal = !showTutorial;
+        setShowTutorial(newVal);
+        localStorage.setItem('st_showTutorial', String(newVal));
+    };
+
     useEffect(() => {
         // GHOST MODE: If dead, see everything
         if (!myPlayer.isAlive) {
@@ -301,12 +311,29 @@ export const GameBoard: React.FC<GameBoardProps> = ({ room, players, myPlayer })
 
                         if (!hint) return null;
 
+                        if (!showTutorial) {
+                            return (
+                                <div className="flex justify-center mb-4">
+                                    <Button variant="ghost" size="sm" onClick={toggleTutorial} className="text-xs text-slate-500 gap-1 h-6">
+                                        <span className="text-sm">💡</span> Show Hints
+                                    </Button>
+                                </div>
+                            );
+                        }
+
                         return (
-                            <div className="bg-blue-900/40 border-l-4 border-blue-400 p-4 rounded animate-fade-in">
-                                <div className="flex items-center gap-2">
+                            <div className="bg-blue-900/40 border-l-4 border-blue-400 p-4 rounded animate-fade-in relative mb-4">
+                                <div className="flex items-center gap-2 pr-6">
                                     <span className="text-xl">💡</span>
                                     <p className="text-sm text-blue-100 font-medium">{hint}</p>
                                 </div>
+                                <button
+                                    onClick={toggleTutorial}
+                                    className="absolute top-2 right-2 text-blue-300 hover:text-white text-xs"
+                                    title="Hide Hints"
+                                >
+                                    ✕
+                                </button>
                             </div>
                         );
                     })()}
