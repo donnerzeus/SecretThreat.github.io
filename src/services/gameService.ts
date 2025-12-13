@@ -424,31 +424,35 @@ export const performSpecialElection = async (roomId: string, nextPresidentUid: s
 
 // Helper to rotate president and reset turn
 const endTurn = async (transaction: any, roomRef: any, room: Room) => {
-
-
-    // If we had a special election, we might need to return to the original order.
-    // But for simplicity based on user request "currentPresidentIndex++", let's just follow the order.
-    // If special election happened, usually the "next" president is the one after the *original* president.
-    // Implementing simple next alive player logic for now.
-
     const currentIdx = room.playerOrder.indexOf(room.currentPresidentUid!);
     let nextIdx = (currentIdx + 1) % room.playerOrder.length;
+    let nextPresidentUid = room.playerOrder[nextIdx];
 
     // Find next alive player
-    // We need player data to check isAlive. 
-    // Since we don't have it in 'room', we assume the client/UI handles "next" logic or we fetch players.
-    // For this transaction, let's just increment. The UI should skip dead players or we need to read players here.
-    // Let's read players to be safe.
-    // This is expensive in a transaction but necessary for correctness.
-    // Optimization: Store isAlive in playerOrder or separate map in Room?
-    // For now, let's just increment.
+    let attempts = 0;
+    while (attempts < room.playerOrder.length) {
+        const pRef = doc(db, 'rooms', roomRef.id, 'players', nextPresidentUid);
+        const pSnap = await transaction.get(pRef);
 
-    const nextPresident = room.playerOrder[nextIdx];
+        if (pSnap.exists() && pSnap.data().isAlive) {
+            break; // Found alive player
+        }
+
+        // Move to next
+        nextIdx = (nextIdx + 1) % room.playerOrder.length;
+        nextPresidentUid = room.playerOrder[nextIdx];
+        attempts++;
+    }
+
+    if (attempts >= room.playerOrder.length) {
+        console.error("No alive players found!");
+        return;
+    }
 
     transaction.update(roomRef, {
         previousPresidentUid: room.currentPresidentUid,
         previousChancellorUid: room.currentChancellorUid,
-        currentPresidentUid: nextPresident,
+        currentPresidentUid: nextPresidentUid,
         currentChancellorCandidateUid: null,
         currentChancellorUid: null,
         turnPhase: 'nominating',
