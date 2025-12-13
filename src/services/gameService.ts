@@ -459,6 +459,19 @@ const endTurn = async (transaction: any, roomRef: any, room: Room) => {
 
 export const nominateChancellor = async (roomId: string, candidateUid: string, candidateName: string) => {
     const roomRef = doc(db, 'rooms', roomId);
+    const candidateRef = doc(db, 'rooms', roomId, 'players', candidateUid);
+
+    // Validate that the candidate is alive
+    const candidateSnap = await getDoc(candidateRef);
+    if (!candidateSnap.exists()) {
+        throw new Error('Candidate player not found');
+    }
+
+    const candidateData = candidateSnap.data();
+    if (!candidateData.isAlive) {
+        throw new Error('Cannot nominate a dead player as Chancellor');
+    }
+
     await updateDoc(roomRef, {
         currentChancellorCandidateUid: candidateUid,
         turnPhase: 'voting',
@@ -544,7 +557,12 @@ export const processVotingResults = async (roomId: string) => {
             let deck = [...(room.policyDeck || [])];
             let discard = [...(room.policyDiscard || [])];
 
+            // Reshuffle if we don't have enough cards
             if (deck.length < 3) {
+                if (deck.length + discard.length < 3) {
+                    console.error('Not enough cards in deck + discard!', { deck: deck.length, discard: discard.length });
+                    // This should never happen in a properly initialized game
+                }
                 deck = [...deck, ...shuffle(discard)];
                 discard = [];
             }
@@ -570,6 +588,9 @@ export const processVotingResults = async (roomId: string) => {
                 let discard = [...(room.policyDiscard || [])];
 
                 if (deck.length < 1) {
+                    if (deck.length + discard.length < 1) {
+                        console.error('Not enough cards for chaos!', { deck: deck.length, discard: discard.length });
+                    }
                     deck = [...deck, ...shuffle(discard)];
                     discard = [];
                 }

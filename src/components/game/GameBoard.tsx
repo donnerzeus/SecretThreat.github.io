@@ -105,14 +105,24 @@ export const GameBoard: React.FC<GameBoardProps> = ({ room, players, myPlayer })
 
 
     const handleNominate = async (candidateUid: string) => {
+        const candidate = players.find(p => p.uid === candidateUid);
+
+        if (!candidate) {
+            alert("Player not found!");
+            return;
+        }
+
+        if (!candidate.isAlive) {
+            alert("You cannot nominate a dead player as Chancellor!");
+            return;
+        }
+
         if (candidateUid === room.previousPresidentUid) {
             alert("You cannot nominate the previous President as Chancellor!");
             return;
         }
-        const candidate = players.find(p => p.uid === candidateUid);
-        if (candidate) {
-            await nominateChancellor(room.roomId, candidateUid, candidate.displayName);
-        }
+
+        await nominateChancellor(room.roomId, candidateUid, candidate.displayName);
     };
 
     const handleVote = async (vote: VoteChoice) => {
