@@ -289,8 +289,28 @@ export const GameBoard: React.FC<GameBoardProps> = ({ room, players, myPlayer })
                         onConfirm={() => { }}
                     />
                     <IdentityCard role={myRole} team={myTeam} />
-                </>
-            )}
+                    {/* Tutorial Hint */}
+                    {(() => {
+                        let hint = null;
+                        if (room.turnPhase === 'nominating' && isPresident) hint = "Choose a Chancellor candidate. Discuss with others but trust no one.";
+                        else if (room.turnPhase === 'voting') hint = "Vote JA if you trust the pair, NEIN if you suspect foul play.";
+                        else if (room.turnPhase === 'legislating_president' && isPresident) hint = "Discard 1 policy. The remaining 2 will be passed to the Chancellor.";
+                        else if (room.turnPhase === 'legislating_chancellor' && isChancellor) hint = "Discard 1 policy. The last one will be ENACTED.";
+                        else if (room.turnPhase === 'pp_investigate' && isPresident) hint = "Choose a player to see their Party Membership (Guardian or Shadow).";
+                        else if (room.turnPhase === 'pp_execution' && isPresident) hint = "Eliminate a player. If you kill the Secret Threat, Guardians win instantly.";
+
+                        if (!hint) return null;
+
+                        return (
+                            <div className="bg-blue-900/40 border-l-4 border-blue-400 p-4 rounded animate-fade-in">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xl">💡</span>
+                                    <p className="text-sm text-blue-100 font-medium">{hint}</p>
+                                </div>
+                            </div>
+                        );
+                    })()}
+                </>)}
 
             {/* Game Info Bar */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

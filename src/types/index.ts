@@ -11,6 +11,7 @@ export interface Player {
     displayName: string;
     isHost: boolean;
     isAlive: boolean;
+    isBot?: boolean;
     joinedAt: Timestamp;
 }
 

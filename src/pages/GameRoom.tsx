@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { subscribeToRoom, subscribeToPlayers, startGame } from '../services/gameService';
+import { subscribeToRoom, subscribeToPlayers, startGame, addBot } from '../services/gameService';
 import type { Room, Player } from '../types';
 import { Layout } from '../components/Layout';
 import { Button } from '../components/ui/Button';
@@ -26,6 +26,15 @@ const GameLobby: React.FC<{ room: Room; players: Player[]; isHost: boolean }> = 
         } catch (e) {
             console.error(e);
             alert('Failed to start game');
+        }
+    };
+
+    const handleAddBot = async () => {
+        try {
+            await addBot(room.roomId);
+        } catch (e) {
+            console.error(e);
+            alert('Failed to add bot');
         }
     };
 
@@ -65,6 +74,7 @@ const GameLobby: React.FC<{ room: Room; players: Player[]; isHost: boolean }> = 
                             </div>
                             <span className="font-medium">{p.displayName}</span>
                             {p.isHost && <span className="ml-auto text-xs text-yellow-500">HOST</span>}
+                            {p.isBot && <span className="ml-auto text-xs text-blue-400 border border-blue-400 px-1 rounded">BOT</span>}
                         </div>
                     ))}
                     {Array.from({ length: Math.max(0, room.minPlayers - players.length) }).map((_, i) => (
@@ -76,14 +86,24 @@ const GameLobby: React.FC<{ room: Room; players: Player[]; isHost: boolean }> = 
             </Card>
 
             {isHost ? (
-                <Button
-                    className="w-full py-4 text-xl flex items-center justify-center gap-2"
-                    disabled={players.length < room.minPlayers}
-                    onClick={handleStart}
-                >
-                    <Play className="w-6 h-6" />
-                    Initialize Operation
-                </Button>
+                <div className="space-y-4">
+                    <Button
+                        className="w-full py-4 text-xl flex items-center justify-center gap-2"
+                        disabled={players.length < room.minPlayers}
+                        onClick={handleStart}
+                    >
+                        <Play className="w-6 h-6" />
+                        Initialize Operation
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        className="w-full text-slate-400 hover:text-white"
+                        onClick={handleAddBot}
+                        disabled={players.length >= room.maxPlayers}
+                    >
+                        + Add AI Agent
+                    </Button>
+                </div>
             ) : (
                 <div className="text-center text-slate-500 animate-pulse">
                     Waiting for host to initiate operation...
@@ -138,8 +158,25 @@ export const GameRoom: React.FC = () => {
         );
     }
 
+    const getAtmosphereClass = () => {
+        if (!room) return '';
+        if (room.turnPhase === 'game_over') return 'bg-slate-900';
+
+        const shadowCount = room.shadowPolicies || 0;
+        const guardianCount = room.guardianPolicies || 0;
+
+        if (shadowCount > guardianCount) {
+            // Shadow Dominance
+            return 'bg-gradient-to-br from-slate-900 via-red-950 to-slate-900 shadow-[inset_0_0_100px_rgba(220,38,38,0.2)]';
+        } else if (guardianCount > shadowCount) {
+            // Guardian Dominance
+            return 'bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 shadow-[inset_0_0_100px_rgba(37,99,235,0.2)]';
+        }
+        return '';
+    };
+
     return (
-        <Layout>
+        <Layout className={getAtmosphereClass()}>
             {room.status === 'lobby' ? (
                 <GameLobby room={room} players={players} isHost={players.find(p => p.uid === user?.uid)?.isHost || false} />
             ) : (

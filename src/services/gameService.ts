@@ -679,6 +679,34 @@ export const processVotingResults = async (roomId: string) => {
     });
 };
 
+export const addBot = async (roomId: string) => {
+    const roomRef = doc(db, 'rooms', roomId);
+    const botUid = `bot-${Math.random().toString(36).substring(2, 9)}`;
+    const botName = `Bot ${Math.floor(Math.random() * 1000)}`;
+
+    await runTransaction(db, async (transaction) => {
+        const roomSnap = await transaction.get(roomRef);
+        if (!roomSnap.exists()) throw new Error('Room not found');
+        const room = roomSnap.data() as Room;
+
+        if (room.playerOrder.length >= room.maxPlayers) throw new Error('Room is full');
+
+        const newPlayer: Player = {
+            uid: botUid,
+            displayName: botName,
+            isHost: false,
+            isAlive: true,
+            isBot: true,
+            joinedAt: Timestamp.now(),
+        };
+
+        transaction.set(doc(db, `rooms/${roomId}/players`, botUid), newPlayer);
+        transaction.update(roomRef, {
+            playerOrder: arrayUnion(botUid)
+        });
+    });
+};
+
 export const endPeek = async (roomId: string) => {
     const roomRef = doc(db, 'rooms', roomId);
     await runTransaction(db, async (transaction) => {
