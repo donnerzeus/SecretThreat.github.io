@@ -528,6 +528,44 @@ export const voteOnGovernment = async (roomId: string, uid: string, vote: VoteCh
     });
 };
 
+export const forceEndVoting = async (roomId: string) => {
+    const roomRef = doc(db, 'rooms', roomId);
+
+    await runTransaction(db, async (transaction) => {
+        const roomSnap = await transaction.get(roomRef);
+        if (!roomSnap.exists()) throw new Error('Room not found');
+        const room = roomSnap.data() as Room;
+
+        if (room.turnPhase !== 'voting') throw new Error('Not in voting phase');
+
+        const newVotes = { ...room.votes };
+
+        // Check all players
+        for (const pUid of room.playerOrder) {
+            // Skip President (they don't vote)
+            if (pUid === room.currentPresidentUid) continue;
+
+            // If player hasn't voted
+            if (!newVotes[pUid]) {
+                const pRef = doc(db, 'rooms', roomId, 'players', pUid);
+                const pSnap = await transaction.get(pRef);
+
+                // If alive and hasn't voted, force 'no'
+                if (pSnap.exists() && pSnap.data().isAlive) {
+                    newVotes[pUid] = 'no';
+                }
+            }
+        }
+
+        // Force transition
+        transaction.update(roomRef, {
+            votes: newVotes,
+            turnPhase: 'voting_results',
+            logs: [...(room.logs || []), createLog("Voting forced by Host. Missing votes counted as NEIN.", "warning")]
+        });
+    });
+};
+
 export const processVotingResults = async (roomId: string) => {
     const roomRef = doc(db, 'rooms', roomId);
 

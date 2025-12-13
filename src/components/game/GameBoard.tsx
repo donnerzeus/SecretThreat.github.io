@@ -20,7 +20,8 @@ import {
     endPeek,
     endInvestigation,
     requestVeto,
-    respondToVeto
+    respondToVeto,
+    forceEndVoting
 } from '../../services/gameService';
 import { ActionLog } from './ActionLog';
 
@@ -423,6 +424,23 @@ export const GameBoard: React.FC<GameBoardProps> = ({ room, players, myPlayer })
                                                 }`}
                                         >
                                             {room.votes?.[myPlayer.uid] === 'no' ? 'VOTED NEIN!' : 'NEIN! (No)'}
+                                        </Button>
+                                    </div>
+                                )}
+
+                                {myPlayer.isHost && (
+                                    <div className="mt-8 pt-4 border-t border-slate-700">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                                            onClick={() => {
+                                                if (confirm("Are you sure? This will count missing votes as 'NEIN' and end the voting phase.")) {
+                                                    forceEndVoting(room.roomId);
+                                                }
+                                            }}
+                                        >
+                                            Force End Voting (Host Only)
                                         </Button>
                                     </div>
                                 )}
