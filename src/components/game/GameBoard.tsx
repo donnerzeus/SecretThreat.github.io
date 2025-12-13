@@ -457,6 +457,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({ room, players, myPlayer })
                                         const vote = room.votes?.[p.uid];
                                         if (!p.isAlive) return null;
 
+                                        const isPlayerPresident = p.uid === room.currentPresidentUid;
+
                                         return (
                                             <div key={p.uid} className="flex flex-col items-center gap-2">
                                                 <div className="font-bold text-white text-xs">{p.displayName}</div>
@@ -464,11 +466,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({ room, players, myPlayer })
                                                     initial={{ rotateY: 180, opacity: 0 }}
                                                     animate={{ rotateY: 0, opacity: 1 }}
                                                     transition={{ delay: index * 0.3, duration: 0.5 }}
-                                                    className={`w-20 h-28 rounded-lg border-4 flex items-center justify-center font-black text-xl shadow-xl ${vote === 'yes' ? 'bg-blue-600 border-blue-400 text-white' :
-                                                        vote === 'no' ? 'bg-red-600 border-red-400 text-white' : 'bg-slate-700'
+                                                    className={`w-20 h-28 rounded-lg border-4 flex items-center justify-center font-black text-xl shadow-xl ${isPlayerPresident ? 'bg-yellow-600/50 border-yellow-500 text-yellow-200' :
+                                                            vote === 'yes' ? 'bg-blue-600 border-blue-400 text-white' :
+                                                                vote === 'no' ? 'bg-red-600 border-red-400 text-white' : 'bg-slate-700'
                                                         }`}
                                                 >
-                                                    {vote === 'yes' ? 'JA!' : 'NEIN!'}
+                                                    {isPlayerPresident ? 'PRES' : (vote === 'yes' ? 'JA!' : 'NEIN!')}
                                                 </motion.div>
                                             </div>
                                         );
