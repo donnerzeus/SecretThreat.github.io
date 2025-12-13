@@ -423,7 +423,7 @@ export const performSpecialElection = async (roomId: string, nextPresidentUid: s
 };
 
 // Helper to rotate president and reset turn
-const endTurn = async (transaction: any, roomRef: any, room: Room) => {
+export const endTurn = async (transaction: any, roomRef: any, room: Room) => {
     const currentIdx = room.playerOrder.indexOf(room.currentPresidentUid!);
     let nextIdx = (currentIdx + 1) % room.playerOrder.length;
     let nextPresidentUid = room.playerOrder[nextIdx];
